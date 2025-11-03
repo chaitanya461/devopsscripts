@@ -1,0 +1,27 @@
+OWASP Dependency-Check is a tool that identifies project dependencies and checks if there are any known, publicly disclosed, vulnerabilities. It can be used in various software development contexts to enhance the security of applications by identifying and alerting developers about vulnerable components that may be included in their projects.
+
+Go to Plugins and install OWASP Dependency-Check and restart
+
+Go to Tools -> Dependency-Check installations -> Name DC-> install automatically --> Save
+
+
+stage('OWASP Dependency Check') {
+
+  steps {
+
+      dependencyCheck additionalArguments: '--scan./', odcInstallation: 'DC'
+
+      dependencyCheckPublisher pattern: '**/dependency-check-report.xml'
+       }
+}
+
+stage('Sonar Quality Gate Scan') {
+
+steps {
+
+      timeout(time: 15, unit: "MINUTES") {
+
+      waitForQualityGate abortPipeline: false
+      }
+   }
+}
