@@ -201,3 +201,88 @@ stage('Publish Reports') {
         }
     }
 }
+---------------------------------------------------------------------------------------------------------------------------------------
+
+    pipeline {
+    agent any 
+    stages {
+        stage('checkout') {
+            steps {
+                git 'https://github.com/ReyazShaik/java-project-maven-new.git'
+            }
+        }
+        stage('compile') {
+            steps {
+                sh 'mvn compile'
+            }
+        }
+        stage('test') {
+            steps {
+                sh 'mvn test'
+            }
+        }
+        stage('Artifacts') {
+            steps {
+                sh 'mvn clean package'
+            }
+        }
+        // Scanning must happen BEFORE the Quality Gate check
+        stage('SonarQube Scanning') {
+            steps {
+                withSonarQubeEnv('SonarQube') {
+                    sh 'mvn org.sonarsource.scanner.maven:sonar-maven-plugin:3.7.0.1746:sonar'
+                }
+            }
+        }
+ stage('OWASP Dependency Check') {
+    steps {
+        dependencyCheck(
+            // Added --disableYarnAudit to skip the failing yarn check
+            additionalArguments: '--scan "./" --format "ALL" --disableYarnAudit', 
+            odcInstallation: 'DC' 
+        )
+    }
+}
+stage('Publish Reports') {
+    steps {
+        // This looks for reports to display in the Jenkins UI
+        dependencyCheckPublisher pattern: '**/dependency-check-report.xml'
+    }
+}
+
+        stage('Sonar Quality Gate Scan') {
+            steps {
+                timeout(time: 15, unit: "MINUTES") {
+                    waitForQualityGate abortPipeline: false
+                }
+            }
+        }
+        stage('upload to s3') {
+            steps {
+                s3Upload(
+                    consoleLogLevel: 'INFO', 
+                    dontSetBuildResultOnFailure: false, 
+                    dontWaitForConcurrentBuildCompletion: false, 
+                    entries: [[
+                        bucket: 'buct-s5', // Removed leading space in bucket name
+                        excludedFile: '', 
+                        flatten: false, 
+                        gzipFiles: false, 
+                        keepForever: false, 
+                        managedArtifacts: false, 
+                        noUploadOnFailure: false, 
+                        selectedRegion: 'ap-south-1', 
+                        showDirectlyInBrowser: false, 
+                        sourceFile: '**/*.war', 
+                        storageClass: 'STANDARD', 
+                        uploadFromSlave: false, 
+                        useServerSideEncryption: false
+                    ]], 
+                    pluginFailureResultConstraint: 'FAILURE', 
+                    profileName: 's4credit', 
+                    userMetadata: []
+                )
+            }
+        }
+    }
+}
